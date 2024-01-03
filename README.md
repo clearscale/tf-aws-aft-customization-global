@@ -1,2 +1,4 @@
 # tf-aws-aft-customization-global
-https://jira.clearscale.net/browse/CSIT-17233
+
+Copy this repository, mark it as private, and enable custom featurs in [terraform/terraform.tfvars](./terraform/terraform.tfvars).
+
