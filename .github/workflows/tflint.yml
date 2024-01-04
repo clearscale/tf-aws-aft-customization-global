@@ -1,7 +1,5 @@
 name: Terraform Lint
-on:
-  push:
-    branches: [ main, develop, workflow_dispatch ]
+on: [ workflow_dispatch ]
   pull_request:
 
 jobs:
