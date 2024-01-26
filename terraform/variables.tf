@@ -1,8 +1,8 @@
 locals {
   # Enable Harness.io CICD features?
   enable_cicd_harness = (
-    length(trim(var.cicd_harness_account)) > 0 &&
-    length(trim(var.cicd_harness_role))
+    length(var.cicd_harness_account) > 0 &&
+    length(var.cicd_harness_role) > 0
   )
 }
 variable "tf_role_name" {
