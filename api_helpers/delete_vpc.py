@@ -22,6 +22,7 @@ def get_regions(client):
   region = json.loads(region_str)
   for reg in region:
     reg_list.append(reg['RegionName'])
+
   print("Found regions:")
   print(reg_list)
   return reg_list
@@ -162,12 +163,12 @@ def del_vpc_all(ec2, vpc):
   5.) Delete security-groups
   6.) Delete the VPC 
   """
-#   del_igw(ec2, vpc)
-#   del_sub(ec2, vpc)
-#   del_rtb(ec2, vpc)
-#   del_acl(ec2, vpc)
-#   del_sgp(ec2, vpc)
-#   del_vpc(ec2, vpc)
+  del_igw(ec2, vpc)
+  del_sub(ec2, vpc)
+  del_rtb(ec2, vpc)
+  del_acl(ec2, vpc)
+  del_sgp(ec2, vpc)
+  del_vpc(ec2, vpc)
 
 def main():
   client = boto3.client('ec2')
