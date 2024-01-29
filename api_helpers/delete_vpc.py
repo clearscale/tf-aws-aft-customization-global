@@ -27,7 +27,7 @@ def get_regions(client):
   print(reg_list)
   return reg_list
 
-def get_default_vpcs(client):
+def get_default_vpcs(client, cidr):
   """ Only deletes VPCs with 172.31.0.0 CIDR """
   vpc_list = []
   vpcs = client.describe_vpcs(
@@ -35,7 +35,7 @@ def get_default_vpcs(client):
       {
           'Name' : 'cidr',
           'Values' : [
-            '172.31.0.0/16',
+            cidr,
           ],
       },
     ]
@@ -170,7 +170,7 @@ def del_vpc_all(ec2, vpc):
   del_sgp(ec2, vpc)
   del_vpc(ec2, vpc)
 
-def main():
+def main(cidr):
   client = boto3.client('ec2')
   regions = get_regions(client)
   
@@ -180,7 +180,7 @@ def main():
       try:
         client = boto3.client('ec2', region_name = region)
         ec2 = boto3.resource('ec2', region_name = region)
-        vpcs = get_default_vpcs(client)
+        vpcs = get_default_vpcs(client, cidr)
       except boto3.exceptions.Boto3Error as e:
         print(e)
         exit(1)
@@ -196,4 +196,6 @@ def main():
   print('End delete_vpc.py script -- Deleted all default VPCs')
 
 if __name__ == "__main__":
-  main()
+  cidr = str(sys.argv[1])
+  print('Using cidr of: ', cidr)
+  main(cidr)
