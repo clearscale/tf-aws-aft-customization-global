@@ -71,11 +71,10 @@ def del_sub(ec2, vpcid):
   """ Delete the subnets """
   vpc_resource = ec2.Vpc(vpcid)
   subnets = vpc_resource.subnets.all()
-  default_subnets = [ec2.Subnet(subnet.id) for subnet in subnets if subnet.default_for_az]
-  
-  if default_subnets:
+  print("checking for subnets")
+  if subnets:
     try:
-      for sub in default_subnets: 
+      for sub in subnets: 
         print("Removing sub-id: ", sub.id) if (VERBOSE == 1) else ""
         sub.delete(
           # DryRun=True
@@ -87,27 +86,26 @@ def del_rtb(ec2, vpcid):
   """ Delete the route-tables """
   vpc_resource = ec2.Vpc(vpcid)
   rtbs = vpc_resource.route_tables.all()
+  print("checking for route tables")
   if rtbs:
     try:
       for rtb in rtbs:
-        assoc_attr = [rtb.associations_attribute for rtb in rtbs]
-        if [rtb_ass[0]['RouteTableId'] for rtb_ass in assoc_attr if rtb_ass[0]['Main'] == True]:
-          print(rtb.id + " is the main route table, continue...")
-          continue
-        print("Removing rtb-id: ", rtb.id) if (VERBOSE == 1) else ""
-        table = ec2.RouteTable(rtb.id)
-        table.delete(
-          # DryRun=True
-        )
-    except boto3.exceptions.Boto3Error as e:
+        print("found route table: ", rtb.id)
+        print("route table associations: ", rtb.associations_attribute)
+        if not rtb.associations_attribute: # check for empty
+          print("NOT main route table - not associations")
+          print("Removing rtb-id: ", rtb.id)
+          table = ec2.RouteTable(rtb.id)
+          table.delete(
+            # DryRun=True
+          )
+    except ClientError as e:
       print(e)
 
 def del_acl(ec2, vpcid):
   """ Delete the network-access-lists """
-  
   vpc_resource = ec2.Vpc(vpcid)      
   acls = vpc_resource.network_acls.all()
-
   if acls:
     try:
       for acl in acls: 
@@ -138,6 +136,28 @@ def del_sgp(ec2, vpcid):
     except boto3.exceptions.Boto3Error as e:
       print(e)
 
+def del_vpce(client, vpcid):
+  response = client.describe_vpc_endpoints(
+    Filters=[
+        {
+            'Name': 'vpc-id',
+            'Values': [
+                vpcid,
+            ]
+        },
+    ]
+  )
+  vpces = response['VpcEndpoints']
+  if vpces:
+    for vpce in vpces:
+      print("Found VPCe :", vpce['VpcEndpointId'])
+    response = client.delete_vpc_endpoints(
+      VpcEndpointIds=[
+          vpce['VpcEndpointId'],
+      ]
+    )
+    # print(response)
+
 def del_vpc(ec2, vpcid):
   """ Delete the VPC """
   vpc_resource = ec2.Vpc(vpcid)
@@ -146,13 +166,18 @@ def del_vpc(ec2, vpcid):
     vpc_resource.delete(
       # DryRun=True
     )
+  except botocore.exceptions.ClientError as e:
+    print(e)
+    print("client error")
   except boto3.exceptions.Boto3Error as e:
-      print(e)
-      print("Please remove dependencies and delete VPC manually.")
+    print(e)
+    print("Please remove dependencies and delete VPC manually.")
+  except ClientError as e:
+    print("Unexpected error: %s" % e)
   #finally:
   #  return status
 
-def del_vpc_all(ec2, vpc):
+def del_vpc_all(client, ec2, vpc):
   """
   Do the work - order of operation
 
@@ -161,41 +186,44 @@ def del_vpc_all(ec2, vpc):
   3.) Delete route-tables
   4.) Delete network access-lists
   5.) Delete security-groups
-  6.) Delete the VPC 
+  6.) Delete the VPC Endpoints
+  7.) Delete the VPC 
   """
+
   del_igw(ec2, vpc)
   del_sub(ec2, vpc)
   del_rtb(ec2, vpc)
   del_acl(ec2, vpc)
   del_sgp(ec2, vpc)
+  del_vpce(client, vpc)
   del_vpc(ec2, vpc)
 
 def main(cidr):
   client = boto3.client('ec2')
-  regions = get_regions(client)
   
-  futures = []
-  with concurrent.futures.ThreadPoolExecutor(max_workers=int(os.getenv("MAX_WORKERS", THREADPOOL_MAX_WORKERS))) as executor:
-    for region in regions:
-      try:
-        client = boto3.client('ec2', region_name = region)
-        ec2 = boto3.resource('ec2', region_name = region)
-        vpcs = get_default_vpcs(client, cidr)
-      except boto3.exceptions.Boto3Error as e:
-        print(e)
-        exit(1)
+  regions = get_regions(client)
+  # regions = ["us-east-1"]
+  
+  for region in regions:
+    try:
+      client = boto3.client('ec2', region_name = region)
+      ec2 = boto3.resource('ec2', region_name = region)
+      vpcs = get_default_vpcs(client, cidr)
+    except boto3.exceptions.Boto3Error as e:
+      print(e)
+      exit(1)
 
-      for vpc in vpcs:
-        print("\n" + "\n" + "REGION:" + region + "\n" + "VPC Id:" + vpc)
-        futures.append(executor.submit(
-            del_vpc_all,
-            ec2,
-            vpc,
-        ))
-  concurrent.futures.wait(futures)
+    for vpc in vpcs:
+      print("\n" + "\n" + "REGION:" + region + "\n" + "VPC Id:" + vpc)
+      del_vpc_all(client, ec2, vpc)
+    
   print('End delete_vpc.py script -- Deleted all default VPCs')
 
 if __name__ == "__main__":
-  cidr = str(sys.argv[1])
-  print('Using cidr of: ', cidr)
-  main(cidr)
+  # must supply cidr argument
+  if len(sys.argv) > 1:
+    cidr = str(sys.argv[1])
+    print('Using cidr of: ', cidr)
+    main(cidr)
+  else:
+    print("no supplied cidr argument, exiting")
