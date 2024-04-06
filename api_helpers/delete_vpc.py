@@ -2,9 +2,7 @@
 # Must be the first line
 from __future__ import print_function
 
-import concurrent.futures
 import sys
-import os
 import json
 import boto3
 
@@ -99,7 +97,7 @@ def del_rtb(ec2, vpcid):
           table.delete(
             # DryRun=True
           )
-    except ClientError as e:
+    except boto3.exceptions.Boto3Error as e:
       print(e)
 
 def del_acl(ec2, vpcid):
@@ -166,14 +164,8 @@ def del_vpc(ec2, vpcid):
     vpc_resource.delete(
       # DryRun=True
     )
-  except botocore.exceptions.ClientError as e:
+  except boto3.exceptions.ClientError as e:
     print(e)
-    print("client error")
-  except boto3.exceptions.Boto3Error as e:
-    print(e)
-    print("Please remove dependencies and delete VPC manually.")
-  except ClientError as e:
-    print("Unexpected error: %s" % e)
   #finally:
   #  return status
 
@@ -199,11 +191,9 @@ def del_vpc_all(client, ec2, vpc):
   del_vpc(ec2, vpc)
 
 def main(cidr):
-  client = boto3.client('ec2')
-  
+  client = boto3.client('ec2')  
   regions = get_regions(client)
-  # regions = ["us-east-1"]
-  
+
   for region in regions:
     try:
       client = boto3.client('ec2', region_name = region)
